@@ -17,6 +17,7 @@ import {
   formatFechaDDMMYYYY
 } from '../utils/datePeru.js';
 import { escapeHtml } from '../utils/codeNormalizer.js';
+import { formatShiftWhatsAppReport, copyTextToClipboard } from '../utils/whatsappReport.js';
 
 const LAST_OPERATOR_KEY = 'stracon_produccion_last_operator_v1';
 const LAST_EQUIPO_KEY = 'stracon_produccion_last_equipo_v1';
@@ -30,6 +31,7 @@ export class CapturaTurnoView {
     this.suggestion = null;
     this.existingSlotRecord = null;
     this.showNewEquipInput = false;
+    this.lastSavedRecord = null;
   }
 
   createDefaultForm(overrides = {}) {
@@ -323,6 +325,9 @@ export class CapturaTurnoView {
             <button type="submit" class="btn-mine btn-primary" style="flex:1 1 280px; min-height:54px; font-size:1.04rem;">
               ${this.editingId ? '💾 ACTUALIZAR TURNO' : '💾 GUARDAR TURNO (Offline Ready)'}
             </button>
+            <button type="button" class="btn-mine btn-whatsapp" id="btn-copy-whatsapp-form" style="flex:0 1 260px; min-height:54px; font-size:1rem;">
+              💬 Copiar para WhatsApp
+            </button>
           </div>
         </form>
       </section>
@@ -381,6 +386,7 @@ export class CapturaTurnoView {
                           <td>${syncBadge}</td>
                           <td>
                             <div class="inline-row">
+                              <button type="button" class="btn-mine btn-sm btn-whatsapp" data-wa-id="${escapeHtml(r.id)}" title="Copiar reporte para WhatsApp">💬</button>
                               <button type="button" class="btn-mine btn-sm btn-secondary" data-edit-id="${escapeHtml(r.id)}" title="Editar">✏️</button>
                               <button type="button" class="btn-mine btn-sm btn-danger" data-delete-id="${escapeHtml(r.id)}" title="Eliminar">🗑️</button>
                             </div>
@@ -562,6 +568,7 @@ export class CapturaTurnoView {
           id: this.editingId || undefined
         });
         const wasEdit = Boolean(this.editingId);
+        this.lastSavedRecord = saved;
         this.editingId = null;
         this.form = this.createDefaultForm({
           codigo_equipo: saved.codigo_equipo,
@@ -583,6 +590,60 @@ export class CapturaTurnoView {
       } catch (err) {
         this.app.showToast('error', err.message);
       }
+    });
+
+    this.mountEl.querySelector('#btn-copy-whatsapp-form')?.addEventListener('click', async () => {
+      const hasFormValues =
+        this.form.horometro_inicial !== '' &&
+        this.form.horometro_final !== '' &&
+        Number(this.form.horometro_final) >= Number(this.form.horometro_inicial);
+
+      const targetRecord = hasFormValues
+        ? {
+            ...this.form,
+            horas_trabajadas: computeShiftMetrics(
+              this.form.horometro_inicial,
+              this.form.horometro_final,
+              this.form.material_fracturado
+            ).horas
+          }
+        : this.lastSavedRecord || this.app.registros[0] || null;
+
+      if (!targetRecord) {
+        this.app.showToast('error', 'Completa Horómetro Inicial y Final o guarda un turno para copiarlo a WhatsApp.');
+        return;
+      }
+
+      const text = formatShiftWhatsAppReport(targetRecord);
+      const copied = await copyTextToClipboard(text);
+      const turnoTxt = targetRecord.turno === 'NOCHE' ? 'Noche' : 'Día';
+      this.app.showToast(
+        copied ? 'success' : 'error',
+        copied
+          ? `💬 Reporte copiado para WhatsApp: ${targetRecord.codigo_equipo} (${formatFechaDDMMYYYY(
+              targetRecord.fecha
+            )} — Turno ${turnoTxt}). ¡Listo para pegar!`
+          : 'No se pudo copiar al portapapeles. Intenta nuevamente.'
+      );
+    });
+
+    this.mountEl.querySelectorAll('[data-wa-id]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-wa-id');
+        const rec = this.app.registros.find((r) => r.id === id);
+        if (!rec) return;
+        const text = formatShiftWhatsAppReport(rec);
+        const copied = await copyTextToClipboard(text);
+        const turnoTxt = rec.turno === 'NOCHE' ? 'Noche' : 'Día';
+        this.app.showToast(
+          copied ? 'success' : 'error',
+          copied
+            ? `💬 Reporte copiado para WhatsApp: ${rec.codigo_equipo} (${formatFechaDDMMYYYY(
+                rec.fecha
+              )} — Turno ${turnoTxt}).`
+            : 'No se pudo copiar al portapapeles.'
+        );
+      });
     });
 
     this.mountEl.querySelectorAll('[data-edit-id]').forEach((btn) => {

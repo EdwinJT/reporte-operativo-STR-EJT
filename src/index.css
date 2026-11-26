@@ -237,6 +237,16 @@ textarea {
   background: #15803D;
 }
 
+.btn-whatsapp {
+  background: #16A34A;
+  color: #FFFFFF;
+  border-color: #15803D;
+}
+
+.btn-whatsapp:hover:not(:disabled) {
+  background: #15803D;
+}
+
 .btn-secondary {
   background: var(--bg-card);
   color: var(--text-main);

@@ -12,6 +12,7 @@ import {
 import { exportProductionWorkbookToExcel } from '../services/excelExporter.js';
 import { formatFechaDDMMYYYY } from '../utils/datePeru.js';
 import { escapeHtml, round1, round2 } from '../utils/codeNormalizer.js';
+import { formatShiftWhatsAppReport, copyTextToClipboard } from '../utils/whatsappReport.js';
 
 export class HistorialCatalogoView {
   constructor(mountEl, app) {
@@ -153,8 +154,9 @@ export class HistorialCatalogoView {
                       <td>${escapeHtml(r.operador || '-')}</td>
                       <td>
                         <div class="inline-row">
-                          <button type="button" class="btn-mine btn-sm btn-secondary" data-hist-edit="${escapeHtml(r.id)}">✏️</button>
-                          <button type="button" class="btn-mine btn-sm btn-danger" data-hist-del="${escapeHtml(r.id)}">🗑️</button>
+                          <button type="button" class="btn-mine btn-sm btn-whatsapp" data-hist-wa="${escapeHtml(r.id)}" title="Copiar reporte para WhatsApp">💬</button>
+                          <button type="button" class="btn-mine btn-sm btn-secondary" data-hist-edit="${escapeHtml(r.id)}" title="Editar">✏️</button>
+                          <button type="button" class="btn-mine btn-sm btn-danger" data-hist-del="${escapeHtml(r.id)}" title="Eliminar">🗑️</button>
                         </div>
                       </td>
                     </tr>`
@@ -275,6 +277,25 @@ export class HistorialCatalogoView {
         fechaHasta: this.filters.hasta || range.max
       });
       this.app.showToast('success', `Excel exportado (${res.fileName}) con ${res.totalRecords} turno(s).`);
+    });
+
+    this.mountEl.querySelectorAll('[data-hist-wa]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-hist-wa');
+        const rec = this.app.registros.find((r) => r.id === id);
+        if (!rec) return;
+        const text = formatShiftWhatsAppReport(rec);
+        const copied = await copyTextToClipboard(text);
+        const turnoTxt = rec.turno === 'NOCHE' ? 'Noche' : 'Día';
+        this.app.showToast(
+          copied ? 'success' : 'error',
+          copied
+            ? `💬 Reporte copiado para WhatsApp: ${rec.codigo_equipo} (${formatFechaDDMMYYYY(
+                rec.fecha
+              )} — Turno ${turnoTxt}).`
+            : 'No se pudo copiar al portapapeles.'
+        );
+      });
     });
 
     this.mountEl.querySelectorAll('[data-hist-edit]').forEach((btn) => {

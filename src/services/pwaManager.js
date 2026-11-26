@@ -2,7 +2,7 @@
  * Gestor de PWA Instalable, Service Worker y Modo Avión (Offline-First).
  */
 
-export const APP_SHELL_VERSION = 'v1.3.5-whatsapp-copy';
+export const APP_SHELL_VERSION = 'v1.3.6-sync-fix';
 
 class PwaManagerService {
   constructor() {

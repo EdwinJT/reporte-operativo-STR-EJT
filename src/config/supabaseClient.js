@@ -174,6 +174,11 @@ class SupabaseClientService {
     const cfg = this.getConfig();
     if (!cfg.isConfigured) return { data: null, error: { message: 'Supabase no configurado.' } };
 
+    const safeNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -182,11 +187,11 @@ class SupabaseClientService {
         codigo_equipo: row.codigo_equipo,
         fecha: row.fecha,
         turno: row.turno,
-        horometro_inicial: Number(row.horometro_inicial),
-        horometro_final: Number(row.horometro_final),
-        horas_trabajadas: Number(row.horas_trabajadas),
-        material_fracturado: Number(row.material_fracturado),
-        rendimiento: Number(row.rendimiento),
+        horometro_inicial: safeNum(row.horometro_inicial),
+        horometro_final: safeNum(row.horometro_final),
+        horas_trabajadas: safeNum(row.horas_trabajadas),
+        material_fracturado: safeNum(row.material_fracturado),
+        rendimiento: safeNum(row.rendimiento),
         area_trabajo: row.area_trabajo || '',
         operador: row.operador || '',
         observaciones: row.observaciones || '',
@@ -204,14 +209,41 @@ class SupabaseClientService {
         body: JSON.stringify([payload]),
         signal: controller.signal
       });
-      clearTimeout(timer);
 
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        return { data: null, error: { message: `HTTP ${res.status}: ${errText}` } };
+      if (res.ok) {
+        clearTimeout(timer);
+        const data = await res.json().catch(() => [payload]);
+        return { data, error: null };
       }
-      const data = await res.json().catch(() => [payload]);
-      return { data, error: null };
+
+      const errText = await res.text().catch(() => '');
+      const isUniqueSlotConflict =
+        res.status === 409 || errText.includes('23505') || errText.includes('uq_registros_equipo_fecha_turno');
+
+      if (isUniqueSlotConflict && payload.codigo_equipo && payload.fecha && payload.turno) {
+        const patchBody = { ...payload };
+        delete patchBody.id;
+        const filterQuery =
+          `codigo_equipo=eq.${encodeURIComponent(payload.codigo_equipo)}` +
+          `&fecha=eq.${encodeURIComponent(payload.fecha)}` +
+          `&turno=eq.${encodeURIComponent(payload.turno)}`;
+        const patchRes = await fetch(`${cfg.url}/rest/v1/registros_produccion?${filterQuery}`, {
+          method: 'PATCH',
+          headers: this._headers(cfg, { Prefer: 'return=representation' }),
+          body: JSON.stringify(patchBody),
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        if (patchRes.ok) {
+          const patched = await patchRes.json().catch(() => [payload]);
+          return { data: Array.isArray(patched) && patched.length > 0 ? patched : [payload], error: null };
+        }
+        const patchErr = await patchRes.text().catch(() => '');
+        return { data: null, error: { message: `HTTP ${patchRes.status}: ${patchErr}` } };
+      }
+
+      clearTimeout(timer);
+      return { data: null, error: { message: `HTTP ${res.status}: ${errText}` } };
     } catch (err) {
       clearTimeout(timer);
       return { data: null, error: { message: err?.message || 'Error de red' } };

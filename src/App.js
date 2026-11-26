@@ -128,31 +128,44 @@ export class AppController {
     const pwa = pwaManager.getState();
     const cfg = supabase.getConfig();
     const sync = syncQueue.getState();
-    const pendingCount = this.registros.filter(
+    const pendingRows = this.registros.filter(
       (r) => !r.es_demo && r.estado !== 'demo' && (r.estado === 'pendiente' || r.estado === 'error')
-    ).length;
+    );
+    const pendingCount = pendingRows.length;
+    const errorCount = pendingRows.filter((r) => r.estado === 'error').length;
 
     if (sync.isSyncing) {
-      return { cls: 'is-local', text: '🔄 Sincronizando...', disabled: true };
+      return { cls: 'is-local', text: '🔄 Sincronizando...', disabled: true, title: 'Sincronizando con Supabase' };
     }
     if (!pwa.isOnline) {
       return {
         cls: 'is-offline',
         text: pendingCount > 0 ? `🔴 Sin señal (${pendingCount} local)` : '🔴 Modo Sin Señal',
-        disabled: false
+        disabled: false,
+        title: 'Trabajando sin conexión en memoria local'
       };
     }
     if (!cfg.isConfigured) {
       return {
         cls: 'is-local',
         text: pendingCount > 0 ? `☁️ Conectar Nube (${pendingCount})` : '☁️ Conectar Nube',
-        disabled: false
+        disabled: false,
+        title: 'Configurar Supabase Cloud'
+      };
+    }
+    if (errorCount > 0) {
+      const firstErr = pendingRows.find((r) => r.estado === 'error')?.error_sync || sync.lastError || '';
+      return {
+        cls: 'is-pending',
+        text: `⚠️ Reintentar (${pendingCount})`,
+        disabled: false,
+        title: firstErr ? `Error al sincronizar: ${firstErr}` : 'Reintentar sincronización con Supabase'
       };
     }
     if (pendingCount > 0) {
-      return { cls: 'is-pending', text: `⬆️ Subir (${pendingCount})`, disabled: false };
+      return { cls: 'is-pending', text: `⬆️ Subir (${pendingCount})`, disabled: false, title: 'Subir registros pendientes' };
     }
-    return { cls: 'is-synced', text: '☁️ Nube al día', disabled: false };
+    return { cls: 'is-synced', text: '☁️ Nube al día', disabled: false, title: 'Sincronizado con Supabase' };
   }
 
   renderShell() {
@@ -172,9 +185,9 @@ export class AppController {
           </div>
 
           <div class="topbar-actions">
-            <button type="button" class="btn-mine btn-topbar-sync ${syncMeta.cls}" id="btn-topbar-sync" ${
-              syncMeta.disabled ? 'disabled' : ''
-            }>
+            <button type="button" class="btn-mine btn-topbar-sync ${syncMeta.cls}" id="btn-topbar-sync" title="${escapeHtml(
+              syncMeta.title || ''
+            )}" ${syncMeta.disabled ? 'disabled' : ''}>
               ${syncMeta.text}
             </button>
             <button type="button" class="btn-mine btn-sm btn-secondary" id="btn-toggle-theme" title="Cambiar tema Día/Noche">
@@ -269,6 +282,7 @@ export class AppController {
       syncBtn.className = `btn-mine btn-topbar-sync ${m.cls}`;
       syncBtn.textContent = m.text;
       syncBtn.disabled = m.disabled;
+      if (m.title) syncBtn.title = m.title;
     }
     const netPill = this.mountEl.querySelector('#pill-net-status');
     const pwa = pwaManager.getState();
@@ -298,7 +312,8 @@ export class AppController {
       const res = await syncQueue.processQueue({ silent: true });
       await this.reloadAllData();
       this.renderActiveView();
-      this.showToast(res?.ok ? 'success' : 'info', syncQueue.getState().lastStatusMessage);
+      const toastType = res?.failed > 0 ? 'error' : res?.ok ? 'success' : 'info';
+      this.showToast(toastType, syncQueue.getState().lastStatusMessage);
     });
 
     this.mountEl.querySelector('#btn-toggle-theme')?.addEventListener('click', () => {

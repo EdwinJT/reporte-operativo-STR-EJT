@@ -368,7 +368,7 @@ export class CapturaTurnoView {
                             : r.estado === 'demo'
                               ? `<span class="badge-pill badge-sync-demo">🧪 Ejemplo</span>`
                               : r.estado === 'error'
-                                ? `<span class="badge-pill badge-sync-err">⚠️ Reintento</span>`
+                                ? `<span class="badge-pill badge-sync-err" title="${escapeHtml(r.error_sync || 'Error al sincronizar')}">⚠️ Reintento</span>`
                                 : `<span class="badge-pill badge-sync-pending">📱 Local</span>`;
                         return `
                         <tr>

@@ -215,7 +215,11 @@ export async function saveShiftRecord(formData) {
 
   const nowIso = new Date().toISOString();
   const existingBySlot = await findExistingShift(cleaned.codigo_equipo, cleaned.fecha, cleaned.turno);
-  const targetId = formData.id || existingBySlot?.id || crypto.randomUUID();
+  let targetId = formData.id || existingBySlot?.id || crypto.randomUUID();
+  if (formData.id && existingBySlot && existingBySlot.id !== formData.id) {
+    await localDb.registros.delete(formData.id);
+    targetId = existingBySlot.id;
+  }
   const existingById = await localDb.registros.get(targetId);
 
   const record = {

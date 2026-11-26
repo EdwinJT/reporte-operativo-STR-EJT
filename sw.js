@@ -3,7 +3,7 @@
  * Precachea el App Shell completo (HTML, JS, CSS, íconos y manifest) para funcionar 100% sin señal.
  */
 
-const CACHE_VERSION = 'v1.3.5-whatsapp-copy';
+const CACHE_VERSION = 'v1.3.6-sync-fix';
 const APP_SHELL_CACHE = `stracon-produccion-appshell-${CACHE_VERSION}`;
 
 const PRECACHE_ASSETS = [

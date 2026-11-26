@@ -115,12 +115,14 @@ class SyncQueueService {
 
       let uploaded = 0;
       let failed = 0;
+      let firstErrorMessage = '';
 
       for (const item of pending) {
         await localDb.registros.put({ ...item, estado: 'sincronizando' });
-        const { error } = await supabase.upsertRegistro(item);
+        const { data: syncedRows, error } = await supabase.upsertRegistro(item);
         if (error) {
           failed++;
+          if (!firstErrorMessage) firstErrorMessage = error.message;
           await localDb.registros.put({
             ...item,
             estado: 'error',
@@ -128,12 +130,25 @@ class SyncQueueService {
           });
         } else {
           uploaded++;
+          const serverRow = Array.isArray(syncedRows) && syncedRows.length > 0 ? syncedRows[0] : null;
           if (item.eliminado) {
             await localDb.registros.delete(item.id);
+          } else if (serverRow && serverRow.id && serverRow.id !== item.id) {
+            await localDb.registros.delete(item.id);
+            await localDb.registros.put({
+              ...serverRow,
+              estado: 'sincronizado',
+              es_demo: false,
+              eliminado: Boolean(serverRow.eliminado),
+              error_sync: ''
+            });
           } else {
             await localDb.registros.put({
               ...item,
+              ...(serverRow || {}),
               estado: 'sincronizado',
+              es_demo: false,
+              eliminado: Boolean(serverRow?.eliminado ?? item.eliminado),
               error_sync: ''
             });
           }
@@ -155,7 +170,10 @@ class SyncQueueService {
           if (existing && (existing.estado === 'pendiente' || existing.estado === 'sincronizando')) {
             continue;
           }
-          if (!existing || (remote.actualizado_en || '') > (existing.actualizado_en || '')) {
+          if (!existing || existing.id !== remote.id || (remote.actualizado_en || '') > (existing.actualizado_en || '')) {
+            if (existing && existing.id !== remote.id) {
+              await localDb.registros.delete(existing.id);
+            }
             await localDb.registros.put({
               ...remote,
               estado: 'sincronizado',
@@ -171,8 +189,9 @@ class SyncQueueService {
       this.lastRunAt = new Date().toISOString();
       if (failed > 0) {
         this.attemptCount++;
+        this.lastError = firstErrorMessage || 'Error al sincronizar';
         const delayMs = BACKOFF_MS[Math.min(this.attemptCount - 1, BACKOFF_MS.length - 1)];
-        this.lastStatusMessage = `Subidos ${uploaded}, ${failed} con error. Reintento en ${Math.round(delayMs / 1000)} s.`;
+        this.lastStatusMessage = `Subidos ${uploaded}, ${failed} con error (${this.lastError}). Reintento en ${Math.round(delayMs / 1000)} s.`;
         clearTimeout(this.retryTimer);
         this.retryTimer = setTimeout(() => this.processQueue({ silent: true }), delayMs);
       } else {

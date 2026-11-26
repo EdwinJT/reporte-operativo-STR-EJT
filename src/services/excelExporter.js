@@ -20,7 +20,7 @@ import {
   formatDiaCortoExcel,
   formatFechaDDMMYYYY,
   getFechaHoyPeru,
-  getMonthTitleSpanish,
+  getPeriodTitleSpanish,
   getValuationPeriodRange
 } from '../utils/datePeru.js';
 
@@ -91,7 +91,7 @@ function buildMatrixSheetXml(matrix, { tituloPersonalizado = '' } = {}) {
 
   const periodTitle =
     (tituloPersonalizado || '').trim() ||
-    getMonthTitleSpanish(matrix.fechaDesde, matrix.fechaHasta) ||
+    getPeriodTitleSpanish(matrix.fechaDesde, matrix.fechaHasta) ||
     'CONTROL OPERATIVO';
 
   const colsXml = [

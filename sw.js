@@ -3,7 +3,7 @@
  * Precachea el App Shell completo (HTML, JS, CSS, íconos y manifest) para funcionar 100% sin señal.
  */
 
-const CACHE_VERSION = 'v1.3.3-supabase-live';
+const CACHE_VERSION = 'v1.3.4-nov-fix';
 const APP_SHELL_CACHE = `stracon-produccion-appshell-${CACHE_VERSION}`;
 
 const PRECACHE_ASSETS = [

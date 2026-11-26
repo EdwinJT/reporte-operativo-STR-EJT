@@ -318,7 +318,7 @@ export function buildMatrixModel(records = [], { codigoEquipo, fechaDesde, fecha
   const eq = normalizeEquipmentCode(codigoEquipo || '');
   const eqRecords = records.filter((r) => !r.eliminado && (!eq || r.codigo_equipo === eq));
 
-  const dayList = generateDateRange(fechaDesde, fechaHasta, 93);
+  const dayList = generateDateRange(fechaDesde, fechaHasta, 366);
   const byDateTurno = new Map();
   for (const r of eqRecords) {
     byDateTurno.set(`${r.fecha}__${r.turno}`, r);

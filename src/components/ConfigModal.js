@@ -69,8 +69,8 @@ export class ConfigModal {
                 !cfg.isConfigured ? 'disabled' : ''
               }>🔄 Sincronizar Ahora</button>
               ${
-                cfg.isConfigured
-                  ? `<button type="button" class="btn-mine btn-sm btn-danger" id="btn-clear-supa">Desconectar</button>`
+                cfg.source === 'localStorage'
+                  ? `<button type="button" class="btn-mine btn-sm btn-danger" id="btn-clear-supa">Restablecer nube por defecto</button>`
                   : ''
               }
             </div>
@@ -101,9 +101,9 @@ export class ConfigModal {
           </div>
 
           <div class="modal-section" style="margin-bottom:0;">
-            <strong>🧪 3. Datos de Ejemplo STRACON (STREX02)</strong>
+            <strong>🧪 3. Datos de Ejemplo STRACON (STREX01 + STREX02)</strong>
             <p style="font-size:0.84rem; margin:0.35rem 0 0.65rem; color:var(--text-muted);">
-              Actualmente tienes <strong>${demoCount}</strong> registro(s) de ejemplo cargados (basados en tu Excel Oct–Nov).
+              Actualmente tienes <strong>${demoCount}</strong> registro(s) de ejemplo cargados (Julio–Noviembre 2026).
               Los ejemplos nunca se suben a Supabase; puedes limpiarlos cuando empieces tu operación real.
             </p>
             <div class="inline-row" style="flex-wrap:wrap;">
@@ -163,7 +163,7 @@ export class ConfigModal {
 
     this.mountEl.querySelector('#btn-clear-supa')?.addEventListener('click', () => {
       supabase.clearConfig();
-      this.testFeedback = { ok: true, message: 'Desconectado de Supabase. Trabajando en modo local.' };
+      this.testFeedback = { ok: true, message: 'Configuración personalizada limpiada. Usando conexión Supabase por defecto.' };
       this.app.updateTopbarStatus();
       this.render();
     });
@@ -184,7 +184,7 @@ export class ConfigModal {
       const n = await loadDemoData();
       await this.app.reloadAllData();
       this.app.renderActiveView();
-      this.app.showToast('success', `Se cargaron ${n} turnos de ejemplo STRACON (STREX02).`);
+      this.app.showToast('success', `Se cargaron ${n} turnos de ejemplo STRACON (STREX01 + STREX02, Julio–Noviembre).`);
       this.render();
     });
 

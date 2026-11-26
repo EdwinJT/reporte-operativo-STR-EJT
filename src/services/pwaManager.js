@@ -2,7 +2,7 @@
  * Gestor de PWA Instalable, Service Worker y Modo Avión (Offline-First).
  */
 
-export const APP_SHELL_VERSION = 'v1.3.3-supabase-live';
+export const APP_SHELL_VERSION = 'v1.3.4-nov-fix';
 
 class PwaManagerService {
   constructor() {

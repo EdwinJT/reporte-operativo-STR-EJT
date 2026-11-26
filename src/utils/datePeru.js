@@ -122,7 +122,7 @@ export function getMonthTitleSpanish(startIso, endIso = startIso) {
   return `${MESES_LARGOS_ES[mo1]} ${y1} - ${MESES_LARGOS_ES[mo2]} ${y2}`;
 }
 
-export function generateDateRange(startIso, endIso, maxDays = 93) {
+export function generateDateRange(startIso, endIso, maxDays = 366) {
   if (!esFechaValida(startIso) || !esFechaValida(endIso)) return [];
   if (startIso > endIso) return [];
   const list = [];
@@ -208,6 +208,45 @@ export function getValuationMonthInfo(isoDate) {
     year: y,
     label: `${mesNombre} ${y}`
   };
+}
+
+/**
+ * Devuelve el rango 26–25 para una clave de mes de valorización 'YYYY-MM'.
+ * Ej.: '2026-11' -> { desde: '2026-10-26', hasta: '2026-11-25', label: 'NOVIEMBRE 2026' }
+ */
+export function getValuationRangeByMonthKey(mesKey) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(mesKey || '').trim());
+  if (!m) return getValuationPeriodRange(getFechaHoyPeru());
+  const y = Number(m[1]);
+  const mo = Number(m[2]); // 1..12
+  let startYear = y;
+  let startMonth = mo - 1;
+  if (startMonth < 1) {
+    startMonth = 12;
+    startYear -= 1;
+  }
+  const mesNombre = MESES_LARGOS_ES[mo - 1] || '';
+  return {
+    desde: `${startYear}-${String(startMonth).padStart(2, '0')}-26`,
+    hasta: `${y}-${String(mo).padStart(2, '0')}-25`,
+    label: `${mesNombre} ${y}`
+  };
+}
+
+/**
+ * Devuelve un título coherente para un rango de fechas:
+ * - Si cae dentro de un único mes de valorización (26–25), devuelve ej. 'NOVIEMBRE 2026'.
+ * - Si abarca varios meses, devuelve ej. 'JULIO - NOVIEMBRE 2026'.
+ */
+export function getPeriodTitleSpanish(startIso, endIso = startIso) {
+  if (!esFechaValida(startIso)) return getMonthTitleSpanish(startIso, endIso);
+  const end = esFechaValida(endIso) ? endIso : startIso;
+  const vStart = getValuationMonthInfo(startIso);
+  const vEnd = getValuationMonthInfo(end);
+  if (vStart.key === vEnd.key) {
+    return vEnd.label;
+  }
+  return getMonthTitleSpanish(startIso, end);
 }
 
 /**

@@ -13,10 +13,12 @@ import { exportProductionWorkbookToExcel } from '../services/excelExporter.js';
 import {
   getFechaHoyPeru,
   getValuationPeriodRange,
+  getValuationRangeByMonthKey,
   getCalendarMonthRange,
   shiftIsoDate,
-  getMonthTitleSpanish,
-  getValuationMonthInfo
+  getPeriodTitleSpanish,
+  getValuationMonthInfo,
+  formatDiaCortoExcel
 } from '../utils/datePeru.js';
 import { escapeHtml } from '../utils/codeNormalizer.js';
 
@@ -53,6 +55,27 @@ export class MatrizControlView {
     }
   }
 
+  getAvailableValuationMonths() {
+    const eqRecords = this.app.registros.filter((r) => r.codigo_equipo === this.codigoEquipo);
+    const source = eqRecords.length > 0 ? eqRecords : this.app.registros;
+    const map = new Map();
+    for (const r of source) {
+      const info = getValuationMonthInfo(r.fecha);
+      if (info.key !== '0000-00' && !map.has(info.key)) {
+        const range = getValuationRangeByMonthKey(info.key);
+        const d1 = formatDiaCortoExcel(range.desde).fechaCorta;
+        const d2 = formatDiaCortoExcel(range.hasta).fechaCorta;
+        map.set(info.key, {
+          key: info.key,
+          label: `${info.label} (${d1} al ${d2})`,
+          desde: range.desde,
+          hasta: range.hasta
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
+  }
+
   applyPreset(preset) {
     this.preset = preset;
     const eqRecords = this.app.registros.filter((r) => r.codigo_equipo === this.codigoEquipo);
@@ -60,13 +83,16 @@ export class MatrizControlView {
 
     if (preset === 'datos') {
       const valRange = getValuationPeriodRange(rangeData.max);
-      if (rangeData.min >= valRange.desde && rangeData.max <= valRange.hasta) {
-        this.fechaDesde = valRange.desde;
-        this.fechaHasta = rangeData.max > valRange.hasta ? rangeData.max : valRange.hasta;
-      } else {
-        this.fechaDesde = rangeData.min;
-        this.fechaHasta = rangeData.max;
-      }
+      this.fechaDesde = valRange.desde;
+      this.fechaHasta = rangeData.max > valRange.hasta ? rangeData.max : valRange.hasta;
+    } else if (preset.startsWith('val:')) {
+      const mKey = preset.slice(4);
+      const valRange = getValuationRangeByMonthKey(mKey);
+      this.fechaDesde = valRange.desde;
+      this.fechaHasta = valRange.hasta;
+    } else if (preset === 'todo') {
+      this.fechaDesde = rangeData.min;
+      this.fechaHasta = rangeData.max;
     } else if (preset === 'valorizacion') {
       const p = getValuationPeriodRange(getFechaHoyPeru());
       this.fechaDesde = p.desde;
@@ -214,12 +240,17 @@ export class MatrizControlView {
     );
     const days = matrix.days;
     const s = matrix.summary;
-    const valInfo = getValuationMonthInfo(this.fechaHasta || this.fechaDesde);
-    const periodTitle =
-      this.tituloPersonalizado.trim() ||
-      valInfo.label ||
-      getMonthTitleSpanish(this.fechaDesde, this.fechaHasta) ||
-      'CONTROL OPERATIVO';
+    const autoPeriodTitle = getPeriodTitleSpanish(this.fechaDesde, this.fechaHasta) || 'CONTROL OPERATIVO';
+    const periodTitle = this.tituloPersonalizado.trim() || autoPeriodTitle;
+    const availableMonths = this.getAvailableValuationMonths();
+    const monthOptsHtml = availableMonths
+      .map(
+        (m) =>
+          `<option value="val:${escapeHtml(m.key)}" ${
+            this.preset === `val:${m.key}` ? 'selected' : ''
+          }>${escapeHtml(m.label)}</option>`
+      )
+      .join('');
 
     const equipOpts = this.app.equipos
       .map(
@@ -258,8 +289,10 @@ export class MatrizControlView {
           <div class="field-group">
             <label class="field-label" for="mat-preset">Período Rápido</label>
             <select id="mat-preset" class="input-mine">
-              <option value="datos" ${this.preset === 'datos' ? 'selected' : ''}>Período activo con datos (26–25)</option>
-              <option value="valorizacion" ${this.preset === 'valorizacion' ? 'selected' : ''}>Valorización actual (26 al 25)</option>
+              <option value="datos" ${this.preset === 'datos' ? 'selected' : ''}>Último mes con datos (26–25)</option>
+              ${monthOptsHtml}
+              <option value="todo" ${this.preset === 'todo' ? 'selected' : ''}>Todo el historial con datos</option>
+              <option value="valorizacion" ${this.preset === 'valorizacion' ? 'selected' : ''}>Valorización calendario actual (26 al 25)</option>
               <option value="mes" ${this.preset === 'mes' ? 'selected' : ''}>Mes Calendario Actual</option>
               <option value="15dias" ${this.preset === '15dias' ? 'selected' : ''}>Últimos 15 días</option>
               <option value="custom" ${this.preset === 'custom' ? 'selected' : ''}>Personalizado</option>
@@ -292,7 +325,7 @@ export class MatrizControlView {
               type="text"
               id="mat-titulo"
               class="input-mine"
-              placeholder="Automático: ${escapeHtml(valInfo.label)}"
+              placeholder="Automático: ${escapeHtml(autoPeriodTitle)}"
               value="${escapeHtml(this.tituloPersonalizado)}"
             />
           </div>
